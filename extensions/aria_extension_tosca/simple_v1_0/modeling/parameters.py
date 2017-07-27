@@ -18,7 +18,8 @@ from aria.utils.formatting import pluralize
 from aria.parser.presentation import Value
 from aria.parser.validation import Issue
 
-from .data_types import coerce_value
+from .data_types import (coerce_value, get_primitive_data_type)
+from ..presentation.types import get_type_by_name
 
 
 #
@@ -149,16 +150,22 @@ def validate_required_values(context, presentation, values, definitions):
 
 def merge_raw_parameter_definition(context, presentation, raw_property_definition,
                                    our_property_definition, field_name, property_name):
-    # Check if we changed the type
-    # TODO: allow a sub-type?
-    type1 = raw_property_definition.get('type')
-    type2 = our_property_definition.type
+    # Check if we changed the parameter type
+    type1_name = raw_property_definition.get('type')
+    type1 = get_type_by_name(context, type1_name, 'data_types')
+    if type1 is None:
+        type1 = get_primitive_data_type(type1_name)
+    our_property_definition._reset_method_cache()
+    type2 = our_property_definition._get_type(context)
+
     if type1 != type2:
-        context.validation.report(
-            'override changes type from "%s" to "%s" for property "%s" in "%s"'
-            % (type1, type2, property_name, presentation._fullname),
-            locator=presentation._get_child_locator(field_name, property_name),
-            level=Issue.BETWEEN_TYPES)
+        if not hasattr(type1, '_is_descendant') or not type1._is_descendant(context, type2):
+            context.validation.report(
+                'property definition type "{0}" is not a descendant of overridden '
+                'property definition type "{1}"' \
+                .format(type1_name, type2._name),
+                locator=presentation._get_child_locator(field_name, property_name),
+                level=Issue.BETWEEN_TYPES)
 
     merge(raw_property_definition, our_property_definition._raw)
 

@@ -193,6 +193,17 @@ class DataType(ExtensiblePresentation):
         return get_data_type(context, self, 'derived_from', allow_none=True)
 
     @cachedmethod
+    def _is_descendant(self, context, the_type):
+        if the_type is None:
+            return False
+        if not hasattr(the_type, '_name'):
+            # Must be a primitive type
+            return self._get_primitive_ancestor(context) == the_type
+        if the_type._name == self._name:
+            return True
+        return self._is_descendant(context, the_type._get_parent(context))
+
+    @cachedmethod
     def _get_primitive_ancestor(self, context):
         parent = self._get_parent(context)
         if parent is not None:
@@ -385,6 +396,14 @@ class InterfaceType(ExtensiblePresentation):
     def _get_parent(self, context):
         return get_parent_presentation(context, self, convert_name_to_full_type_name,
                                        'interface_types')
+
+    @cachedmethod
+    def _is_descendant(self, context, the_type):
+        if the_type is None:
+            return False
+        elif the_type._name == self._name:
+            return True
+        return self._is_descendant(context, the_type._get_parent(context))
 
     @cachedmethod
     def _get_inputs(self, context):

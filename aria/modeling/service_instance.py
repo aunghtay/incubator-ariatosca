@@ -38,7 +38,7 @@ from .mixins import InstanceModelMixin
 
 from ..utils import (
     collections,
-    formatting,
+    formatting
 )
 
 
@@ -227,6 +227,80 @@ class ServiceBase(InstanceModelMixin):
 
     :type: :class:`~datetime.datetime`
     """)
+
+    def get_node_by_type(self, type_name):
+        """
+        Finds the first node of a type (or descendent type).
+        """
+        service_template = self.service_template
+
+        if service_template is not None:
+            node_types = service_template.node_types
+            if node_types is not None:
+                for node in self.nodes.itervalues():
+                    if node_types.is_descendant(type_name, node.type.name):
+                        return node
+
+        return None
+
+    def get_policy_by_type(self, type_name):
+        """
+        Finds the first policy of a type (or descendent type).
+        """
+        service_template = self.service_template
+
+        if service_template is not None:
+            policy_types = service_template.policy_types
+            if policy_types is not None:
+                for policy in self.policies.itervalues():
+                    if policy_types.is_descendant(type_name, policy.type.name):
+                        return policy
+
+        return None
+
+    def satisfy_requirements(self):
+        satisfied = True
+        for node in self.nodes.itervalues():
+            if not node.satisfy_requirements():
+                satisfied = False
+        return satisfied
+
+    def validate_capabilities(self):
+        satisfied = True
+        for node in self.nodes.itervalues():
+            if not node.validate_capabilities():
+                satisfied = False
+        return satisfied
+
+    def find_hosts(self):
+        for node in self.nodes.itervalues():
+            node.find_host()
+
+    def configure_operations(self):
+        for node in self.nodes.itervalues():
+            node.configure_operations()
+        for group in self.groups.itervalues():
+            group.configure_operations()
+        for operation in self.workflows.itervalues():
+            operation.configure()
+
+    def is_node_a_target(self, target_node):
+        for node in self.nodes.itervalues():
+            if self._is_node_a_target(node, target_node):
+                return True
+        return False
+
+    def _is_node_a_target(self, source_node, target_node):
+        if source_node.outbound_relationships:
+            for relationship_model in source_node.outbound_relationships:
+                if relationship_model.target_node.name == target_node.name:
+                    return True
+                else:
+                    node = relationship_model.target_node
+                    if node is not None:
+                        if self._is_node_a_target(node, target_node):
+                            return True
+        return False
 
     @property
     def as_raw(self):
@@ -479,14 +553,15 @@ class NodeBase(InstanceModelMixin):
 
     @classmethod
     def determine_state(cls, op_name, is_transitional):
-        """ :returns the state the node should be in as a result of running the
-            operation on this node.
+        """
+        :returns the state the node should be in as a result of running the operation on this node.
 
-            e.g. if we are running tosca.interfaces.node.lifecycle.Standard.create, then
-            the resulting state should either 'creating' (if the task just started) or 'created'
-            (if the task ended).
+        E.g. if we are running tosca.interfaces.node.lifecycle.Standard.create, then
+        the resulting state should either 'creating' (if the task just started) or 'created'
+        (if the task ended).
 
-            If the operation is not a standard tosca lifecycle operation, then we return None"""
+        If the operation is not a standard TOSCA lifecycle operation, then we return None.
+        """
 
         state_type = 'transitional' if is_transitional else 'finished'
         try:

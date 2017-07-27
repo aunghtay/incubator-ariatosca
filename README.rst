@@ -91,7 +91,7 @@ This section will describe how to run a simple "Hello World" example.
 First, provide ARIA with the ARIA "hello world" service-template and name it (e.g.
 ``my-service-template``)::
 
-    aria service-templates store examples/hello-world/helloworld.yaml my-service-template
+    aria service-templates store examples/hello-world/hello-world.yaml my-service-template
 
 Now create a service based on this service-template and name it (e.g. ``my-service``)::
 
